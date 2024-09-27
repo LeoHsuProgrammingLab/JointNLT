@@ -1,4 +1,6 @@
 /checkpoints/
 /raw_results/
 /.idea/
-/pretrained/
+/pretrained
+__pycache__/
+data/

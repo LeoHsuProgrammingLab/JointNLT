@@ -262,6 +262,8 @@ dependencies:
     - smmap==5.0.0
     - some-package==0.1
     - tb-nightly==2.9.0a20220426
+    - tensorboard
+    - tensorboardX
     - tensorboard-data-server==0.6.1
     - tensorboard-plugin-wit==1.8.1
     - thop==0.0.31-2005241907
