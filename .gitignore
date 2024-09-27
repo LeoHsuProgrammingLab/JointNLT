@@ -4,3 +4,5 @@
 /pretrained
 __pycache__/
 data/
+data_zip/
+checkpoints/
