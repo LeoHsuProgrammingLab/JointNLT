@@ -1,16 +1,27 @@
 import cv2
 import os
 
-def read_bbx(bbx_txt_path):
+def read_bbx(bbx_txt_path, sep=""):
     bbxs = []
     with open(bbx_txt_path, 'r') as f:
         for line in f:
-            coords = list(map(int, line.strip().split()))
+            if sep == "":
+                coords = list(map(int, line.strip().split()))
+            else:
+                coords = list(map(int, line.strip().split(sep)))
             bbxs.append(coords)
     
     return bbxs
 
-def draw_bbxs(imgs, bbxs, video_writer):
+def read_text(text_path):
+    text = ""
+    with open(text_path, 'r') as f:
+        for line in f:
+            text += line + '\n'
+    
+    return text
+
+def draw_bbxs(imgs, bbxs, bbxs_gt, text, video_writer):
     # Iterate through the images and bounding boxes
     for i, img_file in enumerate(imgs):
         # Read the image
@@ -18,9 +29,14 @@ def draw_bbxs(imgs, bbxs, video_writer):
         
         # Get the bounding box for this frame
         x_min, y_min, x_max, y_max = bbxs[i]
+        x_min_gt, y_min_gt, x_max_gt, y_max_gt = bbxs_gt[i]
         
         # Draw the bounding box on the image (color is blue, thickness is 2)
         cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (255, 0, 0), 2)
+        cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (0, 0, 255), 2)
+
+        # text
+        cv2.putText(frame, text, (20, 20), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 2)
         
         # Write the frame with the bounding box to the video
         video_writer.write(frame)
@@ -30,6 +46,8 @@ def draw_bbxs(imgs, bbxs, video_writer):
 
 def generate_video(subset_name):
     bbx_txt_path = f"../test/tracking_results/jointnlt/swin_b_ep300_track/{subset_name}.txt"
+    bbx_gt_txt_path = f"../data/TNL2K_test/{subset_name}/groundtruth.txt"
+    text_path = f"../data/TNL2K_test/{subset_name}/language.txt"
     imgs_dir_path = f"../data/TNL2K_test/{subset_name}/imgs/"
     output_video_path = f"../test/tracking_results/jointnlt/swin_b_ep300_track/{subset_name}.mp4"
     
@@ -39,6 +57,10 @@ def generate_video(subset_name):
     
     # get bbxs
     bbxs = read_bbx(bbx_txt_path)
+    bbxs_gt = read_bbx(bbx_gt_txt_path, ",")
+
+    # get text
+    text = read_text(text_path)
 
     assert(len(bbxs) == len(imgs))
 
@@ -51,7 +73,7 @@ def generate_video(subset_name):
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Codec for mp4 video
     video_writer = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
     
-    draw_bbxs(imgs, bbxs, video_writer)
+    draw_bbxs(imgs, bbxs, bbxs_gt, text, video_writer)
 
 if __name__ == "__main__":
     generate_video('test_001_BatMan_video_06')
