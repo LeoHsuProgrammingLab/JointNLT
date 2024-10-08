@@ -3,6 +3,8 @@
 /.idea/
 /pretrained
 __pycache__/
-data/
+data/*/
 data_zip/
 checkpoints/
+/running_log/
+/test/tracking_results/*/*/*
