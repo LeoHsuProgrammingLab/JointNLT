@@ -15,15 +15,19 @@ SOURCE_DIR="../data_zip/TNL2K_test"
 # Create the target directory if it doesn't exist
 mkdir -p "$TARGET_DIR"
 
+# Initialize a variable to keep track of the number of extracted directories/files
+num_extracted=0
+
 # Loop through each .tar.gz file in the source directory
-for tar_file in "$SOURCE_DIR"/*.tar.gz; do
-    # Extract the .tar.gz file to a temporary directory
-    temp_dir=$(mktemp -d) # Create a temporary directory
-    tar -xzvf "$tar_file" -C "$temp_dir" # Extract the tar.gz file contents
+for tar_file in "$SOURCE_DIR"/*7.tar.gz; do
     
-    # Move all extracted directories/files from the temporary directory to the target directory
-    mv "$temp_dir"/*/* "$TARGET_DIR"
+    tar -xzvf "$tar_file" -C "$TARGET_DIR" # Extract the tar.gz file contents
     
-    # Remove the temporary directory
-    rm -rf "$temp_dir"
+    # Calculate the number of extracted directories/files
+    extracted_count=$(ls -1 "$TARGET_DIR" | wc -l)
+    echo "Extracted $extracted_count directories/files from $tar_file to $TARGET_DIR"
+    num_extracted=$((num_extracted + extracted_count))
 done
+
+# Print the number of extracted directories/files
+echo "Extracted $num_extracted directories/files to $TARGET_DIR"

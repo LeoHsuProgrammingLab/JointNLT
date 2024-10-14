@@ -3,7 +3,7 @@
 /.idea/
 /pretrained
 __pycache__/
-data/*/
+data/TNL2K_test/
 data_zip/
 checkpoints/
 /running_log/
