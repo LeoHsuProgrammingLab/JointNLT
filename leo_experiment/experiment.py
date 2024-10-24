@@ -3,9 +3,9 @@ import torch
 import open_clip
 from torchmetrics.multimodal.clip_score import CLIPScore
 from PIL import Image
-from viz import read_text, read_bbx
+from utils import read_text, read_bbx
 from tqdm import tqdm
-
+import argparse
 import torchvision.transforms as transforms
 
 class ExperimentEngine:
@@ -18,6 +18,8 @@ class ExperimentEngine:
         self.text_features = None
         self.template = None
         self.template_features = None
+        self.first_frame = None
+        self.first_frame_features = None
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     def model_eval(self):
@@ -28,28 +30,27 @@ class ExperimentEngine:
         return (feature_1 @ feature_2.T).item()
 
     # Similarity Calculation
-    def calculate_similarity(self, bbox1, bbox2, image_path):
+    def calculate_similarity(self, image_path, bbox_predicted=None, bbox_base=None):
         # Load and preprocess the image
         image = Image.open(image_path).convert("RGB")
-        prediction = image.crop(bbox2)
+        target = image
 
-        # Preprocess ROIs for CLIP
-        # print(template.size)
-        img_preprocessd = self.preprocess(image).unsqueeze(0).to(self.device)
-        prediction_preprocessed = self.preprocess(prediction).unsqueeze(0).to(self.device)
+        # predicted bounding box
+        if bbox_predicted is not None:
+            target = image.crop(bbox_predicted)
+        
+        target_preprocessed = self.preprocess(target).unsqueeze(0).to(self.device)
         
         # Get CLIP embeddings
-        with torch.no_grad(), torch.cuda.amp.autocast():
-            frame_features = self.model.encode_image(img_preprocessd)
-            prediction_features = self.model.encode_image(prediction_preprocessed)
+        with torch.no_grad(): # torch.cuda.amp.autocast() when need to reduce memory usage
+            target_features = self.model.encode_image(target_preprocessed).to(self.device)
 
             # Normalize the embeddings
-            frame_features /= frame_features.norm(dim=-1, keepdim=True)
-            prediction_features /= prediction_features.norm(dim=-1, keepdim=True)
+            target_features /= target_features.norm(dim=-1, keepdim=True)
 
         # Calculate CLIPScores (cosine similarity) between each ROI and the text
-        text_img_score = self.get_similarity(self.text_features, frame_features)
-        img_img_score = self.get_similarity(prediction_features, self.template_features)
+        text_img_score = self.get_similarity(self.text_features, target_features)
+        img_img_score = self.get_similarity(target_features, self.first_frame_features if bbox_predicted is None else self.template_features)
   
         return text_img_score, img_img_score
 
@@ -57,12 +58,21 @@ class ExperimentEngine:
         img_names = sorted([img_dir + img for img in os.listdir(img_dir) if img.endswith((".jpg", ".png"))])
         bbxs = read_bbx(pred_dir)
         bbxs = [[bbx[0], bbx[1], bbx[0] + bbx[2], bbx[1] + bbx[3]] for bbx in bbxs]
+        
+        # Text
         self.text = read_text(text_dir)
-        self.template = Image.open(img_names[0]).convert("RGB").crop(bbxs[0])
+
+        # First Frame
+        self.first_frame = Image.open(img_names[0]).convert("RGB")
+        self.first_frame_features = self.model.encode_image(self.preprocess(self.first_frame).unsqueeze(0).to(self.device))
+        self.first_frame_features /= self.first_frame_features.norm(dim=-1, keepdim=True)
+        
+        # Template
+        self.template = self.first_frame.crop(bbxs[0])
         template_preprocessed = self.preprocess(self.template).unsqueeze(0).to(self.device)
 
-        with torch.no_grad(), torch.cuda.amp.autocast():
-            self.template_features = self.model.encode_image(template_preprocessed)
+        with torch.no_grad():
+            self.template_features = self.model.encode_image(template_preprocessed).to(self.device)
             self.template_features /= self.template_features.norm(dim=-1, keepdim=True)
 
             self.text_features = self.model.encode_text(self.tokenizer(self.text).to(self.device))
@@ -72,13 +82,12 @@ class ExperimentEngine:
 
         with open(output_path, "w") as f:
             for i, img_name in enumerate(img_names):
+                text_visual_score, visual_template_score = self.calculate_similarity(img_name, bbxs[i])
+                text_frame_score, frame_first_frame_score = self.calculate_similarity(img_name)
                 if (i == 0):
-                    text_visual_score, visual_template_score = self.calculate_similarity(bbxs[i], bbxs[i], img_name)
-                    f.write(f"text and first frame similarity = {round(text_visual_score, 3)}\n")
-                else:
-                    text_visual_score, visual_template_score = self.calculate_similarity(bbxs[0], bbxs[i-1], img_name)
+                    f.write(f"text and template similarity = {round(text_visual_score, 3)}, text and first frame similarity = {round(text_frame_score, 3)}, \n")                    
                 
-                f.write(f"{round(text_visual_score, 3)} {round(visual_template_score, 3)}\n")
+                f.write(f"Text_PredBBX: {round(text_visual_score, 3)}, Template_PredBBX: {round(visual_template_score, 3)}, Text_Frame: {round(text_frame_score, 3)}, Frame_FirstFrame: {round(frame_first_frame_score, 3)}\n")
     
     def calculate_iou(self, bbx1, bbx2):
         # Convert (x, y, w, h) to (x1, y1, x2, y2)
@@ -119,25 +128,36 @@ class ExperimentEngine:
                 iou = self.calculate_iou(ground_truth[i], pred[i])
                 f.write(f"{round(iou, 3)}\n")
 
-if __name__ == "__main__":
+def main():
+    def parse_args():
+        parser = argparse.ArgumentParser(description="Run similarity and IoU calculations for image and text data.")
+        parser.add_argument("--data_path", type=str, default="/scratch/user/agenuinedream/JointNLT/data/TNL2K_test", help="Path to the dataset.")
+        parser.add_argument("--pred_path", type=str, default="/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track", help="Path to the prediction results.")
+        return parser.parse_args()
+
+    args = parse_args()
     engine = ExperimentEngine()
-    data_path = "/scratch/user/agenuinedream/JointNLT/data/TNL2K_test"
+    data_path = args.data_path
     subset_names = [subset_name for subset_name in os.listdir(data_path)]
     subset_names = sorted(subset_names)
 
-    pred_path = "/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track"
+    pred_path = args.pred_path
 
     engine.model_eval()
-    for subset_name in tqdm(subset_names):
+    for i, subset_name in tqdm(enumerate(subset_names), total=len(subset_names)):
         img_dir = f"{data_path}/{subset_name}/imgs/"
         text_file = f"{data_path}/{subset_name}/language.txt"
         pred_file = f"{pred_path}/{subset_name}.txt"
+
         output_path = f"{pred_path}/similarity/{subset_name}.txt"
 
-        # engine.run_similarity(img_dir, text_file, pred_file, output_path)
+        engine.run_similarity(img_dir, text_file, pred_file, output_path)
 
         # Calculate IoU
         ground_truth_file = f"{data_path}/{subset_name}/groundtruth.txt"
         output_path = f"{pred_path}/iou/{subset_name}.txt"
         engine.run_iou(ground_truth_file, pred_file, output_path)
+
+if __name__ == "__main__":
+    main()
 
