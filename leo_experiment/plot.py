@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
-from utils import read_similarity
+from utils import read_similarity, read_iou, read_bbx, read_text
 from tqdm import tqdm
+from data import Normalizer
 import os
 
 class PlotEngine():
@@ -28,7 +29,7 @@ class PlotEngine():
             cv2.rectangle(frame, (x_min_gt, y_min_gt), (x_max_gt, y_max_gt), (0, 0, 255), 2)
 
             # text
-            cv2.putText(frame, text, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 2)
+            cv2.putText(frame, text, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 1)
             
             # Write the frame with the bounding box to the video
             video_writer.write(frame)
@@ -117,34 +118,85 @@ class PlotEngine():
             text_img_scores, img_img_scores = read_similarity(file, target=target)
             all_text_img_scores.append(text_img_scores)
             all_img_img_scores.append(img_img_scores)
-        print(len(all_text_img_scores), len(all_img_img_scores))
 
         min_frames, max_frames = 10000, 0
-        plt.figure(figsize=(50, 10))
-        for i, (text_img_scores, img_img_scores) in enumerate(zip(all_text_img_scores, all_img_img_scores)):
-            min_frames = min(min_frames, len(text_img_scores))
-            max_frames = max(max_frames, len(text_img_scores))
-
-            mean_text_img_score = sum(text_img_scores) / len(text_img_scores)
-            print(f"Mean text_img_score of video {i+1}: {mean_text_img_score}")
-            
+        plt.figure(figsize=(20, 10))
+        for i, (text_img_scores, img_img_scores) in tqdm(enumerate(zip(all_text_img_scores, all_img_img_scores)), total=len(all_text_img_scores)):
             for (text_img_score, img_img_score) in zip(text_img_scores, img_img_scores):
-                plt.plot(i+1, text_img_score, 'o', alpha=0.2, color=f"C{i}", markersize=3)
+                plt.plot(i+1, text_img_score, 'o', alpha=0.2, color=f"C{i}", markersize=2)
+
+            if (i%200 == 199 or i == len(all_text_img_scores)-1):
+                print(f"plot!")
+                plt.xlabel("Video Number")
+                plt.ylabel("Similarity Score")
+                plt.title(f"Similarity Scores for {target}")
+                plt.savefig(output_fig_dir + f"all_similarities_{i//200 + 1}.png")
+                plt.clf()
         
-        plt.xlabel("Video Number")
-        plt.ylabel("Similarity Score")
-        plt.title(f"Similarity Scores for {target}")
-        plt.savefig(output_fig_dir + "all_similarities.png")
+        plt.close()
+    
+    def plot_iou(self, iou_dir, output_fig_dir):
+        iou_files = sorted([iou_dir + iou for iou in os.listdir(iou_dir) if iou.endswith(".txt")])
+
+        # Plot the IoU scores
+        all_iou_scores = []
+        for file in iou_files:
+            iou_scores = read_iou(file)
+            all_iou_scores.append(iou_scores)
+
+        plt.figure(figsize=(20, 10))
+        for i, iou_scores in tqdm(enumerate(all_iou_scores), total=len(all_iou_scores)):
+            mean_iou = sum(iou_scores) / len(iou_scores)
+
+            plt.plot(i+1, mean_iou, 'o', alpha=1, color=f"C{i}", markersize=3)
+
+            if (i%200 == 199 or i == len(all_iou_scores)-1):
+                print(f"plot!")
+                plt.xlabel("Video Number")
+                plt.ylabel("IoU Score")
+                plt.title("Mean IoU Scores")
+                plt.savefig(output_fig_dir + f"all_iou_scores_{i//200 + 1}.png")
+                plt.clf()
+        
         plt.close()
 
-        print(f"Min frames: {min_frames}, Max frames: {max_frames}")
+    def plot_similarity_iou(self, similarity_dir, iou_dir, output_fig_dir):
+        similarity_files = sorted([similarity_dir + sim for sim in os.listdir(similarity_dir) if sim.endswith(".txt")])
+        iou_files = sorted([iou_dir + iou for iou in os.listdir(iou_dir) if iou.endswith(".txt")])
 
-if __name__ == "__main__":
+        for similarity_file, iou_file in tqdm(zip(similarity_files, iou_files), total=len(similarity_files)):
+            text_img_scores, img_img_scores = read_similarity(similarity_file)
+            iou_scores = read_iou(iou_file)
+
+            # text_img_scores = Normalizer().min_max_normalize(text_img_scores)
+            # img_img_scores = Normalizer().min_max_normalize(img_img_scores)
+            # iou_scores = Normalizer().min_max_normalize(iou_scores)
+
+            plt.figure(figsize=(15, 5))
+            plt.plot(range(1, len(text_img_scores)+1), text_img_scores, label="Text-Image", alpha=0.7)
+            plt.plot(range(1, len(img_img_scores)+1), img_img_scores, label="Image-Image", alpha=0.7)
+            plt.plot(range(1, len(iou_scores)+1), iou_scores, label="IoU", alpha=0.7)
+            plt.xlabel("Frame Number")
+            plt.ylabel("Score")
+            plt.title(f"Similarity Scores and IoU")
+            plt.legend()
+            plt.savefig(output_fig_dir + f"{similarity_file.split('/')[-1].split('.')[0]}.png")
+            plt.close()
+        
+def main():
     plot_engine = PlotEngine()
-    similarity_dir = "/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track/similarity/"
-    output_fig_dir = "/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track/figure/"
+    similarity_dir = "/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track/gt_sim/"
+    iou_dir = "/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track/iou/"
+    output_fig_dir = "/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track/figure/sim_gt_iou/"
+    if not os.path.exists(output_fig_dir):
+        os.makedirs(output_fig_dir)
+    plot_engine.plot_similarity_iou(similarity_dir, iou_dir, output_fig_dir)
     # plot_engine.plot_similarity(similarity_dir, output_fig_dir)
+    # plot_engine.plot_iou(iou_dir, output_fig_dir)
 
     # generate video
     data_path = "/scratch/user/agenuinedream/JointNLT/data/TNL2K_test"
     # plot_engine.generate_video(data_path, type="NL")
+
+if __name__ == "__main__":
+    main()

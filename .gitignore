@@ -4,6 +4,7 @@
 /pretrained
 __pycache__/
 data/TNL2K_test/
+data/OTB_sentences/
 data_zip/
 checkpoints/
 /running_log/

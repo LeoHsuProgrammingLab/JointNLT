@@ -2,7 +2,7 @@
 
 ##NECESSARY JOB SPECIFICATIONS
 #SBATCH --job-name=JointTrack     #Set the job name to "JobExample1"
-#SBATCH --time=00:30:00            #Set the wall clock limit to 1hr and 30min
+#SBATCH --time=20:10:00            #Set the wall clock limit to 1hr and 30min
 #SBATCH --ntasks=48                 #Request 1 task
 #SBATCH --ntasks-per-node=48        #Request 1 task/core per node
 #SBATCH --mem=60G                #Request 2560MB (2.5GB) per node
@@ -25,4 +25,5 @@
 # python tracking/analysis_results.py --dataset_name tnl2k --tracker_param swin_b_ep300
 
 cd $SCRATCH/JointNLT/leo_experiment
-python experiment.py --data_path /scratch/user/agenuinedream/JointNLT/data/TNL2K_test --pred_path /scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300
+# python experiment.py --data_path /scratch/user/agenuinedream/JointNLT/data/TNL2K_test --pred_path /scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track
+python llava_augmentation.py 

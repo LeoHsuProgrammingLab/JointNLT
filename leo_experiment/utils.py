@@ -41,3 +41,11 @@ def read_similarity(similarity_path, target='Template'):
                 raise ValueError(f"Invalid target: {target}")
     
     return text_img_score, img_img_score
+
+def read_iou(iou_path):
+    iou_scores = []
+    with open(iou_path, 'r') as f:
+        for line in f:
+            iou_scores.append(float(line.strip()))
+    
+    return iou_scores

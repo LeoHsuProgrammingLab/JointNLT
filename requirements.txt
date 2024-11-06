@@ -10,7 +10,7 @@ boto3==1.21.42
 botocore==1.24.42
 cachetools==5.0.0
 certifi==2021.10.8
-clip==0.2.0
+clip==1.0
 colorama==0.4.4
 cycler==0.11.0
 cython==0.29.28
