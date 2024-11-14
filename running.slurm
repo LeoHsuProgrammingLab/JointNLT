@@ -2,11 +2,11 @@
 
 ##NECESSARY JOB SPECIFICATIONS
 #SBATCH --job-name=JointTrack     #Set the job name to "JobExample1"
-#SBATCH --time=20:10:00            #Set the wall clock limit to 1hr and 30min
+#SBATCH --time=25:10:00            #Set the wall clock limit to 1hr and 30min
 #SBATCH --ntasks=48                 #Request 1 task
 #SBATCH --ntasks-per-node=48        #Request 1 task/core per node
-#SBATCH --mem=60G                #Request 2560MB (2.5GB) per node
-#SBATCH --output=./running_log/Example1Out.%j    #Send stdout/err to "Example1Out.[jobID]"
+#SBATCH --mem=40G                #Request 2560MB (2.5GB) per node
+#SBATCH --output=./running_log/faster/Example1Out.%j    #Send stdout/err to "Example1Out.[jobID]"
 #SBATCH --gres=gpu:a100:1
 #SBATCH --partition=gpu
 # SBATCH --nodes=1

@@ -6,17 +6,17 @@ from transformers import AutoProcessor, LlavaForConditionalGeneration
 from tqdm import tqdm
 
 class LLaVA_Engine():
-    def __init__(self, model_name="llava-hf/llava-1.5-7b-hf"):
+    def __init__(self, cache_dir, model_name="llava-hf/llava-1.5-7b-hf"):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = LlavaForConditionalGeneration.from_pretrained(
             model_name, 
             torch_dtype=torch.float16, 
-            cache_dir="/scratch/user/agenuinedream/.cache/huggingface"
+            cache_dir=cache_dir
         )
         self.model.to(self.device)
         self.processor = AutoProcessor.from_pretrained(
             model_name, 
-            cache_dir="/scratch/user/agenuinedream/.cache/huggingface"
+            cache_dir=cache_dir
         )
     
     def conversation_template(self, text_content, role="user"):
@@ -29,6 +29,20 @@ class LLaVA_Engine():
                 ],
             },
         ]
+    
+    def prompt_template(self, desc_template, desc_refined="", template_id=0):
+#                 This is the updated description of tracking target object in the previous frame: {desc_refined}. \n \
+        prompt_list = [
+            f"""
+                This is the original description of tracked target object in the first frame: {desc_template}.
+                Please do the following:
+                1. Describe this object in current frame more concisely, updated to fit the current situation in one sentence.
+                2. Output the bounding box coordinates of this object in [x1, y1, x2, y2] format. If the target object doesn't exist in current frame, please output coordinate [0, 0, 0, 0].
+                Please format the output as a single line, with the description and bounding box separated by '#': updated_description #bounding_box
+            """
+        ]
+        
+        return prompt_list[template_id]
     
     def process_input(self, imgs, prompts):   
         template_prompts = [self.processor.apply_chat_template(self.conversation_template(prompt), add_generation_prompt=True) for prompt in prompts]
@@ -46,20 +60,18 @@ def main():
     output_dir = '/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track/llava_text'
     data_dir = '/scratch/user/agenuinedream/JointNLT/data/TNL2K_test'
     data_list = sorted(os.listdir(data_dir))
+    llava = LLaVA_Engine(cache_dir="/scratch/user/agenuinedream/.cache/huggingface")
+
     for data in tqdm(data_list):
         img_dir = os.path.join(data_dir, data, 'imgs')
         text_file = os.path.join(data_dir, data, 'language.txt')
         with open(text_file, 'r') as f:
-            desc = f.readlines()
-        prompt = f" \
-            This is the tracking target object: {desc}. \n 
-            Describe this object in this image more concisely and give the bounding box coordinates of this object in [x1, y1, x2, y2] format. \n 
-            If the object is not in the image, please output coordinate [0, 0, 0, 0]
-        "
+            desc = f.readlines().strip()
+           
+        prompt = llava.prompt_template(desc)
         img_list = sorted([f for f in os.listdir(img_dir) if f.endswith(('.jpg', '.png'))])
         imgs = [Image.open(os.path.join(img_dir, img_name)) for img_name in img_list]
         
-        llava = LLaVA_Engine()
         batch_size = 20
 
         # handle output file
@@ -70,10 +82,10 @@ def main():
         for i in range(0, len(imgs), batch_size):
             batch_imgs = imgs[i:i + batch_size]
             prompts = [prompt] * len(batch_imgs)
-            outputs = llava.batch_output(batch_imgs, prompts)
+            outputs = llava.batch_output(batch_imgs, prompts, 70)
             for output in outputs:
                 with open(output_file, 'a') as f:
-                    f.write(output.split(':')[-1].strip() + '\n')
+                    f.write(output.split('ASSISTANT:')[-1].strip() + '\n')
 
 def original_decode():
     cache_dir = "/scratch/user/agenuinedream/.cache/huggingface"
@@ -109,11 +121,11 @@ def original_decode():
     inputs = processor(images=[image_stop, image_cats], text=prompts, padding=True, return_tensors="pt").to(model.device)
 
     with torch.no_grad():
-        generated_ids = model.generate(**inputs, max_new_tokens=30)
+        generated_ids = model.generate(**inputs, max_new_tokens=60)
         outputs = processor.batch_decode(generated_ids, skip_special_tokens=True)   
 
     for i, output in enumerate(outputs):
-        print(f"Output {i}: {output.split(':')[-1].strip()}")
+        print(f"Output {i}: {output.split('ASSISTANT:')[-1].strip()}")
 
 if __name__ == "__main__": 
     main()

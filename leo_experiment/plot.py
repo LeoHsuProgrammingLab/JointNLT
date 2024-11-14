@@ -1,8 +1,11 @@
 import matplotlib.pyplot as plt
-from utils import read_similarity, read_iou, read_bbx, read_text
+from utils import read_similarity, read_iou, read_bbx, read_text, \
+extract_llava_bbx, x_y_w_h_to_x1_y1_x2_y2, normalized_coord_to_x1_y1_x2_y2, \
+add_text_to_video
 from tqdm import tqdm
 from data import Normalizer
 import os
+import cv2
 
 class PlotEngine():
     def __init__(self):
@@ -14,14 +17,8 @@ class PlotEngine():
             # Read the image
             frame = cv2.imread(img_file)
             
-            # Get the bounding box for this frame
-            x_min, y_min, w, h = bbxs[i]
-            x_max, y_max = x_min + w, y_min + h
-            x_min_gt, y_min_gt, w_gt, h_gt = bbxs_gt[i]
-            x_max_gt, y_max_gt = x_min_gt + w_gt, y_min_gt + h_gt
-
-            # print(f"Predicted bbox: {(x_min, y_min, x_max, y_max)}")
-            # print(f"Ground truth bbox: {(x_min_gt, y_min_gt, x_max_gt, y_max_gt)}")
+            x_min, y_min, x_max, y_max = bbxs[i]
+            x_min_gt, y_min_gt, x_max_gt, y_max_gt = bbxs_gt[i]
             
             # Draw the bounding box on the image (color is blue, thickness is 2)
             # [x1, y1, w, h]
@@ -37,52 +34,48 @@ class PlotEngine():
         # Release the video writer
         video_writer.release()
 
-    def generate_video(data_path, type="NL_BB"):
+    def check_path_existence(self, paths):
+        for path in paths:
+            if not os.path.exists(path):
+                print(f"Error: Path {path} does not exist.")
+                return False
+        return True
+
+    def generate_video(self, data_path, task="NL_BB"):
         subset_names = [subset_name for subset_name in os.listdir(data_path)]
         subset_names = sorted(subset_names)
 
-        target = "swin_b_ep300_track" if type == 'NL_BB' else "swin_b_ep300"
+        target = "swin_b_ep300_track" if task == 'NL_BB' else "swin_b_ep300"
 
         for i, subset_name in tqdm(enumerate(subset_names), total=len(subset_names)):
             try:
                 # Define paths
-                bbx_txt_path = f"../test/tracking_results/jointnlt/{target}/{subset_name}.txt"
-                output_video_path = f"../test/tracking_results/jointnlt/{target}/{subset_name}.mp4"
+                bbx_txt_path = f"../test/tracking_results/jointnlt/{target}/llava_text/{subset_name}_llava.txt"
+                output_video_path = f"../test/tracking_results/jointnlt/{target}/llava_video/{subset_name}_llava.mp4"
 
                 # Define subset paths
                 bbx_gt_txt_path = f"../data/TNL2K_test/{subset_name}/groundtruth.txt"
                 text_path = f"../data/TNL2K_test/{subset_name}/language.txt"
-                imgs_dir_path = f"../data/TNL2K_test/{subset_name}/imgs/"
+                imgs_dir_path = f"../data/TNL2K_test/{subset_name}/imgs"
                 
                 # Check if the paths exist
-                if not os.path.exists(bbx_txt_path):
-                    print(f"Error: Bounding box file {bbx_txt_path} does not exist.")
-                    return
-                if not os.path.exists(bbx_gt_txt_path):
-                    print(f"Error: Ground truth bounding box file {bbx_gt_txt_path} does not exist.")
-                    return
-                if not os.path.exists(text_path):
-                    print(f"Error: Language file {text_path} does not exist.")
-                    return
-                if not os.path.isdir(imgs_dir_path):
-                    print(f"Error: Image directory {imgs_dir_path} does not exist.")
-                    return
-
+                if not self.check_path_existence([bbx_txt_path, bbx_gt_txt_path, text_path, imgs_dir_path]):
+                    continue
+                  
                 # sort images
-                imgs = [imgs_dir_path + img for img in os.listdir(imgs_dir_path) if img.endswith((".jpg", ".png"))]
+                imgs = [os.path.join(imgs_dir_path, img) for img in os.listdir(imgs_dir_path) if img.endswith((".jpg", ".png"))]
                 if not imgs:
                     print(f"Error: No images found in directory {imgs_dir_path}.")
                     return
                 imgs.sort()
 
                 # get bbxs
-                bbxs = read_bbx(bbx_txt_path)
+                bbxs = extract_llava_bbx(bbx_txt_path)
                 bbxs_gt = read_bbx(bbx_gt_txt_path, ",")
+                print(f"bbxs: {len(bbxs)}, bbxs_gt: {len(bbxs_gt)}")
 
                 # get text
                 text = read_text(text_path)
-
-                assert len(bbxs) == len(imgs), "Mismatch between bounding boxes and images."
 
                 # Read the first image to get dimensions
                 first_frame = cv2.imread(imgs[0])
@@ -97,7 +90,15 @@ class PlotEngine():
                 video_writer = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
                 
                 # Draw bounding boxes and write video frames
-                draw_bbxs(imgs, bbxs, bbxs_gt, text, video_writer)
+                # bbxs = x_y_w_h_to_x1_y1_x2_y2(bbxs)
+                bbxs = normalized_coord_to_x1_y1_x2_y2(bbxs, width, height)
+                bbxs_gt = x_y_w_h_to_x1_y1_x2_y2(bbxs_gt)
+
+                if len(bbxs) < len(bbxs_gt):
+                    for i in range(len(bbxs_gt) - len(bbxs)):
+                        bbxs.append([0, 0, 0, 0])
+                print(f"bbxs: {len(bbxs)}, bbxs_gt: {len(bbxs_gt)}")
+                self.draw_bbxs(imgs, bbxs, bbxs_gt, text, video_writer)
 
                 # Release video writer
                 video_writer.release()
@@ -160,24 +161,24 @@ class PlotEngine():
         
         plt.close()
 
-    def plot_similarity_iou(self, similarity_dir, iou_dir, output_fig_dir):
+    def plot_similarity_iou(self, similarity_dir, similarity_gt_dir, iou_dir, output_fig_dir):
         similarity_files = sorted([similarity_dir + sim for sim in os.listdir(similarity_dir) if sim.endswith(".txt")])
+        similarity_gt_files = sorted([similarity_gt_dir + sim for sim in os.listdir(similarity_gt_dir) if sim.endswith(".txt")])
         iou_files = sorted([iou_dir + iou for iou in os.listdir(iou_dir) if iou.endswith(".txt")])
 
-        for similarity_file, iou_file in tqdm(zip(similarity_files, iou_files), total=len(similarity_files)):
+        for similarity_file, similarity_gt_file, iou_file in tqdm(zip(similarity_files, similarity_gt_files, iou_files), total=len(similarity_files)):
             text_img_scores, img_img_scores = read_similarity(similarity_file)
+            text_gt_img_scores, img_gt_img_scores = read_similarity(similarity_gt_file)
             iou_scores = read_iou(iou_file)
 
-            # text_img_scores = Normalizer().min_max_normalize(text_img_scores)
-            # img_img_scores = Normalizer().min_max_normalize(img_img_scores)
-            # iou_scores = Normalizer().min_max_normalize(iou_scores)
-
             plt.figure(figsize=(15, 5))
-            plt.plot(range(1, len(text_img_scores)+1), text_img_scores, label="Text-Image", alpha=0.7)
-            plt.plot(range(1, len(img_img_scores)+1), img_img_scores, label="Image-Image", alpha=0.7)
+            plt.plot(range(1, len(text_img_scores)+1), text_img_scores, label="Text-PredBBox", alpha=0.7, color='green')
+            plt.plot(range(1, len(img_img_scores)+1), img_img_scores, label="Image-PredBBox", alpha=0.7, color='green')
+            plt.plot(range(1, len(text_gt_img_scores)+1), text_gt_img_scores, label="Text-GTBBox", alpha=0.7, color='red')
+            plt.plot(range(1, len(img_gt_img_scores)+1), img_gt_img_scores, label="Image-GTBBox", alpha=0.7, color='red')
             plt.plot(range(1, len(iou_scores)+1), iou_scores, label="IoU", alpha=0.7)
             plt.xlabel("Frame Number")
-            plt.ylabel("Score")
+            plt.ylabel("Similarity Score")
             plt.title(f"Similarity Scores and IoU")
             plt.legend()
             plt.savefig(output_fig_dir + f"{similarity_file.split('/')[-1].split('.')[0]}.png")
@@ -185,18 +186,29 @@ class PlotEngine():
         
 def main():
     plot_engine = PlotEngine()
-    similarity_dir = "/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track/gt_sim/"
+    similarity_dir = "/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track/similarity/"
+    similarity_gt_dir = "/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track/gt_sim/"
     iou_dir = "/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track/iou/"
-    output_fig_dir = "/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track/figure/sim_gt_iou/"
+    output_fig_dir = "/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track/figure/sim_sim_gt_iou/"
     if not os.path.exists(output_fig_dir):
         os.makedirs(output_fig_dir)
-    plot_engine.plot_similarity_iou(similarity_dir, iou_dir, output_fig_dir)
+    # plot_engine.plot_similarity_iou(similarity_dir, similarity_gt_dir, iou_dir, output_fig_dir)
     # plot_engine.plot_similarity(similarity_dir, output_fig_dir)
     # plot_engine.plot_iou(iou_dir, output_fig_dir)
 
     # generate video
     data_path = "/scratch/user/agenuinedream/JointNLT/data/TNL2K_test"
-    # plot_engine.generate_video(data_path, type="NL")
+    print(data_path, "NL_BB")
+    # plot_engine.generate_video(data_path)
+
+    text_path = '/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track/llava_text/Assian_video_Z03_done_llava.txt'
+    video_path = '/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track/llava_video/Assian_video_Z03_done_llava.mp4'
+    output_video_path = '/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track/llava_video/Assian_video_Z03_done_llava_text.mp4'
+    texts = []
+    with open(text_path, "r") as f:
+        for line in f:
+            texts.append(line.strip())
+    add_text_to_video(video_path, output_video_path, texts)
 
 if __name__ == "__main__":
     main()

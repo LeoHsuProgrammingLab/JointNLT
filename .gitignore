@@ -9,3 +9,5 @@ data_zip/
 checkpoints/
 /running_log/
 /test/tracking_results/*/*/*
+/.ipynb_checkpoints/
+/leo_experiment/.ipynb_checkpoints/
