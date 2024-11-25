@@ -62,11 +62,11 @@ def main():
     data_list = sorted(os.listdir(data_dir))
     llava = LLaVA_Engine(cache_dir="/scratch/user/agenuinedream/.cache/huggingface")
 
-    for data in tqdm(data_list):
+    for i, data in tqdm(enumerate(data_list), total=len(data_list)):
         img_dir = os.path.join(data_dir, data, 'imgs')
         text_file = os.path.join(data_dir, data, 'language.txt')
         with open(text_file, 'r') as f:
-            desc = f.readlines().strip()
+            desc = f.read().strip()
            
         prompt = llava.prompt_template(desc)
         img_list = sorted([f for f in os.listdir(img_dir) if f.endswith(('.jpg', '.png'))])
@@ -87,45 +87,45 @@ def main():
                 with open(output_file, 'a') as f:
                     f.write(output.split('ASSISTANT:')[-1].strip() + '\n')
 
-def original_decode():
-    cache_dir = "/scratch/user/agenuinedream/.cache/huggingface"
-    model = LlavaForConditionalGeneration.from_pretrained(
-        "llava-hf/llava-1.5-7b-hf", 
-        torch_dtype=torch.float16, 
-        device_map="auto",
-        cache_dir=cache_dir
-    )
-    processor = AutoProcessor.from_pretrained(
-        "llava-hf/llava-1.5-7b-hf",
-        cache_dir=cache_dir
-    )
+# def original_decode():
+#     cache_dir = "/scratch/user/agenuinedream/.cache/huggingface"
+#     model = LlavaForConditionalGeneration.from_pretrained(
+#         "llava-hf/llava-1.5-7b-hf", 
+#         torch_dtype=torch.float16, 
+#         device_map="auto",
+#         cache_dir=cache_dir
+#     )
+#     processor = AutoProcessor.from_pretrained(
+#         "llava-hf/llava-1.5-7b-hf",
+#         cache_dir=cache_dir
+#     )
 
-    url = "https://www.ilankelman.org/stopsigns/australia.jpg"
-    image_stop = Image.open(requests.get(url, stream=True).raw)
+#     url = "https://www.ilankelman.org/stopsigns/australia.jpg"
+#     image_stop = Image.open(requests.get(url, stream=True).raw)
 
-    url = "http://images.cocodataset.org/val2017/000000039769.jpg"
-    image_cats = Image.open(requests.get(url, stream=True).raw)
+#     url = "http://images.cocodataset.org/val2017/000000039769.jpg"
+#     image_cats = Image.open(requests.get(url, stream=True).raw)
 
-    conservation_1 = [
-        {
-            "role": "user", 
-            "content": [
-                {"type": "image"}, 
-                {"type": "text", "text": "Describe this image."},
-            ],
-        },
-    ]
+#     conservation_1 = [
+#         {
+#             "role": "user", 
+#             "content": [
+#                 {"type": "image"}, 
+#                 {"type": "text", "text": "Describe this image."},
+#             ],
+#         },
+#     ]
 
-    prompt_1 = processor.apply_chat_template(conservation_1, add_generation_prompt=True)
-    prompts = [prompt_1, prompt_1]
-    inputs = processor(images=[image_stop, image_cats], text=prompts, padding=True, return_tensors="pt").to(model.device)
+#     prompt_1 = processor.apply_chat_template(conservation_1, add_generation_prompt=True)
+#     prompts = [prompt_1, prompt_1]
+#     inputs = processor(images=[image_stop, image_cats], text=prompts, padding=True, return_tensors="pt").to(model.device)
 
-    with torch.no_grad():
-        generated_ids = model.generate(**inputs, max_new_tokens=60)
-        outputs = processor.batch_decode(generated_ids, skip_special_tokens=True)   
+#     with torch.no_grad():
+#         generated_ids = model.generate(**inputs, max_new_tokens=60)
+#         outputs = processor.batch_decode(generated_ids, skip_special_tokens=True)   
 
-    for i, output in enumerate(outputs):
-        print(f"Output {i}: {output.split('ASSISTANT:')[-1].strip()}")
+#     for i, output in enumerate(outputs):
+#         print(f"Output {i}: {output.split('ASSISTANT:')[-1].strip()}")
 
 if __name__ == "__main__": 
     main()

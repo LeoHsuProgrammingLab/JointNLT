@@ -11,13 +11,15 @@ class PlotEngine():
     def __init__(self):
         pass
 
-    def draw_bbxs(self, imgs, bbxs, bbxs_gt, text, video_writer):
+    def draw_bbxs_and_texts(self, imgs, bbxs, bbxs_gt, texts, video_writer):
         # Iterate through the images and bounding boxes
-        for i, img_file in enumerate(imgs):
+        for i, (img_file, text) in enumerate(zip(imgs, texts)):
             # Read the image
             frame = cv2.imread(img_file)
-            
-            x_min, y_min, x_max, y_max = bbxs[i]
+            if (len(bbxs[i]) != 4 ):
+                x_min, y_min, x_max, y_max = 0, 0, 0, 0
+            else:
+                x_min, y_min, x_max, y_max = bbxs[i]
             x_min_gt, y_min_gt, x_max_gt, y_max_gt = bbxs_gt[i]
             
             # Draw the bounding box on the image (color is blue, thickness is 2)
@@ -26,7 +28,14 @@ class PlotEngine():
             cv2.rectangle(frame, (x_min_gt, y_min_gt), (x_max_gt, y_max_gt), (0, 0, 255), 2)
 
             # text
-            cv2.putText(frame, text, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 1)
+            thickness_border = 5
+            thickness_text = 3
+            color_border = (0, 0, 0)
+            color_text = (255, 255, 255)
+            font_scale = 1.5
+            position = (50, 50)
+            cv2.putText(frame, text, position, cv2.FONT_HERSHEY_SIMPLEX, font_scale, color_border, thickness_border)
+            cv2.putText(frame, text, position, cv2.FONT_HERSHEY_SIMPLEX, font_scale, color_text, thickness_text)
             
             # Write the frame with the bounding box to the video
             video_writer.write(frame)

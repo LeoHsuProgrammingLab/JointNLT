@@ -50,24 +50,29 @@ def read_iou(iou_path):
     
     return iou_scores
 
-def extract_llava_bbx(file_path):
+def extract_llava_bbx(file_path, frame_num):
     print(file_path)
     with open(file_path, "r") as file:
         lines = file.readlines()
-    bbxs = []
+    assert(len(lines) >= frame_num)
+    bbxs, refined_texts = [], []
     for line in lines:
         if '[' not in line:
+            bbxs.append([0, 0, 0, 0])
+            refined_texts.append(line)
             continue
+        refined_text = line.split('[')[0].strip()
         result = line.split('[')[-1].split(']')[0].strip()
     
         result = result.split(',')
-        result = [coord.strip() for coord in result]
+        result = [coord.strip().strip('#') for coord in result]
         if (len(result) < 4 or '' in result):
             bbxs.append([0, 0, 0, 0])
             continue
         bbx = [float(coord.strip()) for coord in result]
         bbxs.append(bbx)
-    return bbxs
+        refined_texts.append(refined_text)
+    return bbxs, refined_texts
 
 def x_y_w_h_to_x1_y1_x2_y2(bbxs):
     for bbx in bbxs:
