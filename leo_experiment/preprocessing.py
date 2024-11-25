@@ -31,6 +31,8 @@ def llava_bbx_to_video(gt_dir, llava_dir, output_dir):
     file_names = os.listdir(gt_dir)
     file_names.sort()
     for file_name in file_names:
+        if ('Assian' not in file_name):
+            continue
         llava_file = os.path.join(llava_dir, f"{file_name}_llava.txt")
         gt_file = os.path.join(gt_dir, f"{file_name}/groundtruth.txt")
         frame_num = len(os.listdir(os.path.join(gt_dir, file_name, 'imgs')))
@@ -96,26 +98,34 @@ def llava_bbx_to_video(gt_dir, llava_dir, output_dir):
         video_writer.release()
         print(f"Video saved successfully at {output_video_path}")
 
+def remove_spare_lines(file_path):
+    with open(file_path, 'r') as f:
+        lines = f.readlines()
+        lines = [line for line in lines if line.strip()]
+    
+    with open(file_path, 'w') as f:
+        f.writelines(lines)
+
 def main():
     # construct_a_subset()
     gt_dir = '/scratch/user/agenuinedream/JointNLT/data/TNL2K_test'
     llava_dir = '/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track/llava_text'
     output_dir = '/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track'
+    new_src_dir = '/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track/jointnlt_pred'
+    if (not os.path.exists(new_src_dir)):
+        os.makedirs(new_src_dir)
 
+    for file_name in os.listdir(llava_dir + '_subset'):
+        remove_spare_lines(os.path.join(llava_dir + '_subset', file_name))
     # llava_bbx_to_video(gt_dir, llava_dir, output_dir)
 
-    llava_text_subset_dir = os.path.join(output_dir, 'llava_text_subset')
-    llava_texts = os.listdir(llava_text_subset_dir)
-    llava_texts.sort()
+    # file_names = os.listdir(output_dir)
+    # file_names = [f for f in file_names if f.endswith('.txt')]
 
-    for llava_text in tqdm(llava_texts):
-        with open(os.path.join(llava_text_subset_dir, llava_text), 'r') as f:
-            # remove the empty lines
-            texts = [line.strip() for line in f if line.strip()]
-            # remove the content of file and write the texts to the same file
-            with open(os.path.join(llava_text_subset_dir, llava_text), 'w') as f:
-                for text in texts:
-                    f.write(text + '\n')
+    # for file_name in tqdm(file_names):
+    #     # mv to the other directory
+    #     shutil.move(os.path.join(output_dir, file_name), os.path.join(new_src_dir, file_name))
+
 
 if __name__ == "__main__":
     main()

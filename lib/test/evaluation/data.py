@@ -22,11 +22,12 @@ class BaseDataset:
 
 class Sequence:
     """Class for the sequence in an evaluation."""
-    def __init__(self, name, frames, dataset, ground_truth_rect, ground_truth_seg=None, init_data=None,
+    def __init__(self, name, frames, dataset, ground_truth_rect, texts=None, ground_truth_seg=None, init_data=None,
                  object_class=None, target_visible=None, object_ids=None, multiobj_mode=False,
                  language_query: Optional[str] = None):
         self.name = name
         self.frames = frames
+        self.texts = texts
         self.dataset = dataset
         self.ground_truth_rect = ground_truth_rect
         self.ground_truth_seg = ground_truth_seg

@@ -103,7 +103,11 @@ class JointNLT(BaseTracker):
             all_boxes_save = info['init_bbox'] * self.cfg.MODEL.NUM_OBJECT_QUERIES
             return {"all_boxes": all_boxes_save}
 
-    def track(self, image, info: dict = None):
+    def track(self, image, text, info: dict = None):
+        self.text_input = self._text_input_process(text, self.params.cfg.MODEL.LANGUAGE.BERT.MAX_QUERY_LEN)
+        with torch.no_grad():
+            self.text_dict = self.network.forward_text(self.text_input)
+        
         H, W, _ = image.shape
         self.frame_id += 1
 

@@ -44,6 +44,10 @@ class TNL2KDataset(BaseDataset):
         nlp_path = '{}/{}/language.txt'.format(self.base_path, sequence_name)
         nlp_rect = load_text(str(nlp_path), delimiter=',', dtype=str)
         nlp_rect = str(nlp_rect)
+
+        text_path = '{}/{}/llava_text.txt'.format(self.base_path, sequence_name)
+        with open(text_path, 'r') as f:
+            texts = f.readlines()
         # print(f'nlp_rect  type: {type(nlp_rect)}, value:{nlp_rect}')
         # target_visible = np.logical_and(full_occlusion == 0, out_of_view == 0)
 
@@ -56,7 +60,7 @@ class TNL2KDataset(BaseDataset):
             print(frames_path)
         # absolute path
         f_list = [os.path.join(frames_path, p) for p in frames_list]
-        return Sequence(sequence_name, f_list, 'tnl2k', ground_truth_rect.reshape(-1, 4),
+        return Sequence(sequence_name, f_list, 'tnl2k', ground_truth_rect.reshape(-1, 4), texts = texts, 
                         object_class=None, target_visible=None, language_query=nlp_rect)
 
     def __len__(self):
