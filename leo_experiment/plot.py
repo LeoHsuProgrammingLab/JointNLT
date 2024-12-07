@@ -49,6 +49,9 @@ class PlotEngine():
                 print(f"Error: Path {path} does not exist.")
                 return False
         return True
+    
+    def generate_video_(self, data_path):
+        pass
 
     def generate_video(self, data_path, task="NL_BB"):
         subset_names = [subset_name for subset_name in os.listdir(data_path)]
@@ -176,21 +179,22 @@ class PlotEngine():
         iou_files = sorted([iou_dir + iou for iou in os.listdir(iou_dir) if iou.endswith(".txt")])
 
         for similarity_file, similarity_gt_file, iou_file in tqdm(zip(similarity_files, similarity_gt_files, iou_files), total=len(similarity_files)):
+            file_name = iou_file.split('.')[0].split('/')[-1]
             text_img_scores, img_img_scores = read_similarity(similarity_file)
             text_gt_img_scores, img_gt_img_scores = read_similarity(similarity_gt_file)
             iou_scores = read_iou(iou_file)
 
             plt.figure(figsize=(15, 5))
-            plt.plot(range(1, len(text_img_scores)+1), text_img_scores, label="Text-PredBBox", alpha=0.7, color='green')
+            plt.plot(range(1, len(text_img_scores)+1), text_img_scores, label="Text-PredBBox", alpha=0.7, color='green', linestyle='--')
             plt.plot(range(1, len(img_img_scores)+1), img_img_scores, label="Image-PredBBox", alpha=0.7, color='green')
-            plt.plot(range(1, len(text_gt_img_scores)+1), text_gt_img_scores, label="Text-GTBBox", alpha=0.7, color='red')
+            plt.plot(range(1, len(text_gt_img_scores)+1), text_gt_img_scores, label="Text-GTBBox", alpha=0.7, color='red', linestyle='--')
             plt.plot(range(1, len(img_gt_img_scores)+1), img_gt_img_scores, label="Image-GTBBox", alpha=0.7, color='red')
             plt.plot(range(1, len(iou_scores)+1), iou_scores, label="IoU", alpha=0.7)
             plt.xlabel("Frame Number")
             plt.ylabel("Similarity Score")
-            plt.title(f"Similarity Scores and IoU")
+            plt.title(f"{file_name}")
             plt.legend()
-            plt.savefig(output_fig_dir + f"{similarity_file.split('/')[-1].split('.')[0]}.png")
+            plt.savefig(output_fig_dir + f"{file_name}.png")
             plt.close()
         
 def main():
@@ -201,23 +205,23 @@ def main():
     output_fig_dir = "/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track/figure/sim_sim_gt_iou/"
     if not os.path.exists(output_fig_dir):
         os.makedirs(output_fig_dir)
-    # plot_engine.plot_similarity_iou(similarity_dir, similarity_gt_dir, iou_dir, output_fig_dir)
+    plot_engine.plot_similarity_iou(similarity_dir, similarity_gt_dir, iou_dir, output_fig_dir)
     # plot_engine.plot_similarity(similarity_dir, output_fig_dir)
     # plot_engine.plot_iou(iou_dir, output_fig_dir)
 
     # generate video
-    data_path = "/scratch/user/agenuinedream/JointNLT/data/TNL2K_test"
-    print(data_path, "NL_BB")
+    # data_path = "/scratch/user/agenuinedream/JointNLT/data/TNL2K_test"
+    # print(data_path, "NL_BB")
     # plot_engine.generate_video(data_path)
 
-    text_path = '/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track/llava_text/Assian_video_Z03_done_llava.txt'
-    video_path = '/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track/llava_video/Assian_video_Z03_done_llava.mp4'
-    output_video_path = '/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track/llava_video/Assian_video_Z03_done_llava_text.mp4'
-    texts = []
-    with open(text_path, "r") as f:
-        for line in f:
-            texts.append(line.strip())
-    add_text_to_video(video_path, output_video_path, texts)
+    # text_path = '/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track/llava_text/Assian_video_Z03_done_llava.txt'
+    # video_path = '/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track/llava_video/Assian_video_Z03_done_llava.mp4'
+    # output_video_path = '/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track/llava_video/Assian_video_Z03_done_llava_text.mp4'
+    # texts = []
+    # with open(text_path, "r") as f:
+    #     for line in f:
+    #         texts.append(line.strip())
+    # add_text_to_video(video_path, output_video_path, texts)
 
 if __name__ == "__main__":
     main()

@@ -4,6 +4,7 @@ import os
 from PIL import Image
 from transformers import AutoProcessor, LlavaForConditionalGeneration
 from tqdm import tqdm
+from llava_prompt_list import generate_prompt_list
 
 class LLaVA_Engine():
     def __init__(self, cache_dir, model_name="llava-hf/llava-1.5-7b-hf"):
@@ -31,16 +32,7 @@ class LLaVA_Engine():
         ]
     
     def prompt_template(self, desc_template, desc_refined="", template_id=0):
-#                 This is the updated description of tracking target object in the previous frame: {desc_refined}. \n \
-        prompt_list = [
-            f"""
-                This is the original description of tracked target object in the first frame: {desc_template}.
-                Please do the following:
-                1. Describe this object in current frame more concisely, updated to fit the current situation in one sentence.
-                2. Output the bounding box coordinates of this object in [x1, y1, x2, y2] format. If the target object doesn't exist in current frame, please output coordinate [0, 0, 0, 0].
-                Please format the output as a single line, with the description and bounding box separated by '#': updated_description #bounding_box
-            """
-        ]
+        prompt_list = generate_prompt_list(desc_template)
         
         return prompt_list[template_id]
     
@@ -57,7 +49,9 @@ class LLaVA_Engine():
         return outputs
 
 def main():
-    output_dir = '/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track/llava_text'
+    output_dir = '/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track/llava_text_1'
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
     data_dir = '/scratch/user/agenuinedream/JointNLT/data/TNL2K_test'
     data_list = sorted(os.listdir(data_dir))
     llava = LLaVA_Engine(cache_dir="/scratch/user/agenuinedream/.cache/huggingface")
@@ -68,7 +62,7 @@ def main():
         with open(text_file, 'r') as f:
             desc = f.read().strip()
            
-        prompt = llava.prompt_template(desc)
+        prompt = llava.prompt_template(desc, template_id=2)
         img_list = sorted([f for f in os.listdir(img_dir) if f.endswith(('.jpg', '.png'))])
         imgs = [Image.open(os.path.join(img_dir, img_name)) for img_name in img_list]
         

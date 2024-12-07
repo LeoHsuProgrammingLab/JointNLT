@@ -106,17 +106,33 @@ def remove_spare_lines(file_path):
     with open(file_path, 'w') as f:
         f.writelines(lines)
 
+def move_files(src_dir, dest_dir, file_names):
+    for file_name in tqdm(file_names):
+        src_path = os.path.join(src_dir, file_name)
+        dest_path = os.path.join(dest_dir, file_name)
+        shutil.move(src_path, dest_path)
+
+def copy_files(src_dir, dest_dir, file_names):
+    for file_name in tqdm(file_names):
+        src_path = os.path.join(src_dir, file_name)
+        dest_path = os.path.join(dest_dir, file_name)
+        shutil.copy(src_path, dest_path)
+
 def main():
     # construct_a_subset()
     gt_dir = '/scratch/user/agenuinedream/JointNLT/data/TNL2K_test'
     llava_dir = '/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track/llava_text'
     output_dir = '/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track'
     new_src_dir = '/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track/jointnlt_pred'
-    if (not os.path.exists(new_src_dir)):
-        os.makedirs(new_src_dir)
+    refined_jointnlt_pred = '/scratch/user/agenuinedream/JointNLT/test/tracking_results/jointnlt/swin_b_ep300_track/refined_jointnlt_pred'
+    
+    file_names = os.listdir(refined_jointnlt_pred)
+    file_names = [f for f in file_names if f.endswith('.txt')]
+    # move_files(output_dir, refined_joint_pred, file_names)
+    copy_files(new_src_dir, output_dir, file_names)
 
-    for file_name in os.listdir(llava_dir + '_subset'):
-        remove_spare_lines(os.path.join(llava_dir + '_subset', file_name))
+    # for file_name in os.listdir(llava_dir + '_subset'):
+    #     remove_spare_lines(os.path.join(llava_dir + '_subset', file_name))
     # llava_bbx_to_video(gt_dir, llava_dir, output_dir)
 
     # file_names = os.listdir(output_dir)
